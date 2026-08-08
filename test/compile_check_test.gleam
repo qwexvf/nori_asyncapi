@@ -85,6 +85,33 @@ fn write_project(types: String, handlers: String) -> Nil {
   Nil
 }
 
+/// The server dispatcher (types + server) compiles, including the decoders and
+/// encoders it calls in the types module.
+pub fn server_dispatcher_compiles_test() {
+  let assert Ok(doc) = nori_asyncapi.parse_file("examples/chat.yaml")
+  let spec = nori_asyncapi.build_ir(doc)
+  let _ = simplifile.delete(gen_dir)
+  let assert Ok(_) = simplifile.create_directory_all(gen_dir)
+  let assert Ok(_) =
+    simplifile.write(project_dir <> "/gleam.toml", scratch_gleam_toml)
+  let assert Ok(_) =
+    simplifile.write(
+      gen_dir <> "/types.gleam",
+      nori_asyncapi.generate_gleam_types(spec),
+    )
+  let assert Ok(_) =
+    simplifile.write(
+      gen_dir <> "/server.gleam",
+      nori_asyncapi.generate_gleam_server(spec, "generated/types"),
+    )
+  let output =
+    shell("cd " <> project_dir <> " && gleam build 2>&1; echo __EXIT:$?")
+  case string.contains(output, "__EXIT:0") {
+    True -> Nil
+    False -> panic as { "server dispatcher failed to compile:\n" <> output }
+  }
+}
+
 // Fixtures duplicated as functions so this module is self-contained (the shared
 // `fixtures` module holds the same specs).
 

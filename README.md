@@ -48,6 +48,7 @@ From an AsyncAPI spec with a channel, messages, and operations:
 | `stores.ts` | frontend (opt-in) | `useSyncExternalStore`-compatible observable per subscribe message |
 | `types.gleam` | backend | payload records/enums + JSON codecs (via nori's emitter) |
 | `handlers.gleam` | backend | `handle_*` stubs (client→server) and `emit_*` helpers (server→client) |
+| `server.gleam` | backend | transport-neutral dispatcher: decode incoming frames → typed handler callbacks, encode outgoing messages |
 
 ### Example
 
@@ -100,6 +101,34 @@ pub fn emit_on_presence(msg: types.Presence) -> Nil { todo }
 ```
 
 Full generated output for the chat spec lives in [`examples/generated/`](examples/generated).
+
+## Server dispatch (Gleam)
+
+`server.gleam` is a transport-neutral runtime. It decodes a
+`{ "type": "<MessageName>", "payload": <payload> }` envelope, and routes it to a
+`Handlers` callback record — you supply the callbacks, it does the decoding.
+Because it takes a plain string frame, it plugs into any server (Mist, or
+anything); it does not depend on a server library.
+
+```gleam
+import generated/server.{Handlers}
+
+let handlers =
+  Handlers(
+    on_chat_sent: fn(msg) { io.println("chat: " <> msg.text) },
+    on_chat_edited: fn(_msg) { Nil },
+    on_chat_deleted: fn(_msg) { Nil },
+  )
+
+// on each received WebSocket text frame:
+let _ = server.dispatch(handlers, frame)
+
+// to push a message to the client, encode and send the returned string:
+let frame = server.send_presence(types.Presence(user: "ada", status: types.Online))
+```
+
+Outgoing `send_*` encoders and incoming handlers are split by direction, so the
+compiler stops you sending a receive-only message or handling a send-only one.
 
 ## Using it in React
 
@@ -173,6 +202,7 @@ pub fn main() {
 | `generate_typescript_stores(spec, client_module)` | neutral TS store layer |
 | `generate_gleam_types(spec)` | Gleam types + codecs |
 | `generate_gleam_handlers(spec, types_module)` | Gleam handler stubs |
+| `generate_gleam_server(spec, types_module)` | Gleam dispatcher (decode + route + encode) |
 
 ## Architecture
 

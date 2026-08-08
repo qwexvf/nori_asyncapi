@@ -99,6 +99,10 @@ fn write_gleam(cfg: Config, spec) -> Nil {
         t.dir <> "/handlers.gleam",
         nori_asyncapi.generate_gleam_handlers(spec, t.types_module),
       )
+      write(
+        t.dir <> "/server.gleam",
+        nori_asyncapi.generate_gleam_server(spec, t.types_module),
+      )
     }
   }
 }

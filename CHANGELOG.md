@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.2.0
+
+### Added
+
+- Gleam server dispatcher generator (`generate_gleam_server`, `server.gleam`): a
+  transport-neutral runtime that decodes a `{type, payload}` envelope into typed
+  handler callbacks (a `Handlers` record, one field per client→server message)
+  and provides `send_*` encoders for server→client messages. Not coupled to any
+  server library — feed it string frames from Mist or anything. Verified to
+  compile with the real compiler.
+- The CLI now also writes `server.gleam` alongside `types.gleam` and
+  `handlers.gleam` for the Gleam target.
+
 ## v0.1.0
 
 Initial release.

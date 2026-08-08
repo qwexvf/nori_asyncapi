@@ -135,6 +135,49 @@ pub fn ts_enum_renders_as_union_test() {
   has(ts, "\"closed\"") |> should.be_true
 }
 
+// --- Gleam server dispatcher ---
+
+fn server_of(spec: String) -> String {
+  let assert Ok(doc) = nori_asyncapi.parse_yaml(spec)
+  nori_asyncapi.generate_gleam_server(
+    nori_asyncapi.build_ir(doc),
+    "generated/types",
+  )
+}
+
+pub fn server_receive_becomes_handler_test() {
+  // chat's sendChat is a server receive → handler callback + dispatch arm
+  let assert Ok(doc) = nori_asyncapi.parse_file("examples/chat.yaml")
+  let code =
+    nori_asyncapi.generate_gleam_server(
+      nori_asyncapi.build_ir(doc),
+      "generated/types",
+    )
+  has(code, "on_chat_sent: fn(types.ChatSent) -> Nil") |> should.be_true
+  has(code, "\"ChatSent\" ->") |> should.be_true
+  has(code, "types.chat_sent_decoder()") |> should.be_true
+}
+
+pub fn server_send_becomes_encoder_test() {
+  let assert Ok(doc) = nori_asyncapi.parse_file("examples/chat.yaml")
+  let code =
+    nori_asyncapi.generate_gleam_server(
+      nori_asyncapi.build_ir(doc),
+      "generated/types",
+    )
+  has(code, "pub fn send_presence(msg: types.Presence) -> String {")
+  |> should.be_true
+  has(code, "types.encode_presence(msg)") |> should.be_true
+}
+
+pub fn server_no_receive_has_no_dispatch_test() {
+  // ws_counts only has a send op → no Handlers/dispatch, just an encoder
+  let code = server_of(fixtures.ws_counts)
+  has(code, "pub fn dispatch(") |> should.be_false
+  has(code, "No `receive` operations") |> should.be_true
+  has(code, "pub fn send_count_update(") |> should.be_true
+}
+
 // --- Gleam handlers ---
 
 pub fn gleam_send_op_emits_emitter_test() {

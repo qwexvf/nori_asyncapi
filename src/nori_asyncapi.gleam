@@ -18,6 +18,7 @@
 //// ```
 
 import nori_asyncapi/codegen/gleam_handlers
+import nori_asyncapi/codegen/gleam_server
 import nori_asyncapi/codegen/gleam_types
 import nori_asyncapi/codegen/typescript
 import nori_asyncapi/document.{type Document}
@@ -74,4 +75,15 @@ pub fn generate_gleam_handlers(
   types_module: String,
 ) -> String {
   gleam_handlers.generate(spec, types_module)
+}
+
+/// Generate the Gleam server dispatcher — a transport-neutral runtime that
+/// decodes incoming `{type, payload}` frames into typed handler calls and
+/// encodes outgoing messages. `types_module` is the import path of the
+/// companion module from `generate_gleam_types`.
+pub fn generate_gleam_server(
+  spec: AsyncCodegenIR,
+  types_module: String,
+) -> String {
+  gleam_server.generate(spec, types_module)
 }
