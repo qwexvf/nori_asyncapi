@@ -1,5 +1,9 @@
 # nori_asyncapi
 
+[![Package Version](https://img.shields.io/hexpm/v/nori_asyncapi)](https://hex.pm/packages/nori_asyncapi)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/nori_asyncapi/)
+[![test](https://github.com/qwexvf/nori_asyncapi/actions/workflows/test.yml/badge.svg)](https://github.com/qwexvf/nori_asyncapi/actions/workflows/test.yml)
+
 AsyncAPI 3.x code generation for Gleam. A satellite of [nori](https://github.com/qwexvf/nori).
 
 Parses AsyncAPI specs (YAML or JSON) into a typed document, builds a codegen IR
