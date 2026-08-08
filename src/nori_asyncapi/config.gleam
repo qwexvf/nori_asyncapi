@@ -38,7 +38,15 @@ pub type GleamTarget {
 
 /// TypeScript target: client, and optionally the store layer.
 pub type TsTarget {
-  TsTarget(dir: String, stores: Bool, stores_dir: String, client_module: String)
+  TsTarget(
+    dir: String,
+    stores: Bool,
+    stores_dir: String,
+    client_module: String,
+    /// "channel" (per-channel clients, default) or "gateway" (one /ws,
+    /// {type,payload} envelope — matches the Gleam server dispatcher).
+    transport: String,
+  )
 }
 
 pub type ConfigError {
@@ -58,6 +66,7 @@ pub fn default(spec: String, out_dir: String, stores: Bool) -> Config {
       stores: stores,
       stores_dir: out_dir,
       client_module: "./client",
+      transport: "channel",
     )),
   )
 }
@@ -129,6 +138,7 @@ fn ts_target_decoder() -> Decoder(Option(TsTarget)) {
     "./client",
     decode.string,
   )
+  use transport <- decode.optional_field("transport", "channel", decode.string)
   // stores_dir defaults to dir when unset
   let resolved_stores_dir = case stores_dir {
     "" -> dir
@@ -143,6 +153,7 @@ fn ts_target_decoder() -> Decoder(Option(TsTarget)) {
           stores: stores,
           stores_dir: resolved_stores_dir,
           client_module: client_module,
+          transport: transport,
         )),
       )
   }

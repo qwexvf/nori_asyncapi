@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.3.0
+
+### Added
+
+- Gateway transport mode for the TypeScript client (`generate_typescript_gateway`,
+  or `transport: gateway` in the config). Emits a single `GatewayClient` that
+  multiplexes every channel over one WebSocket using the `{type,payload}`
+  envelope — the exact wire format the generated Gleam server dispatcher speaks.
+  Fixes the mismatch where the default per-channel client (one URL per channel,
+  raw payloads) could not talk to a single-`/ws` gateway server. Direction
+  inversion is unchanged: server `send` → client `on*`, server `receive` →
+  client `send*`. Verified `tsc --strict`.
+
 ## v0.2.0
 
 ### Added

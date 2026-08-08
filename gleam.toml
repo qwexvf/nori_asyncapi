@@ -1,5 +1,5 @@
 name = "nori_asyncapi"
-version = "0.2.0"
+version = "0.3.0"
 description = "AsyncAPI 3.x code generation for Gleam — parse specs, generate types, channels, and WS/SSE handlers. Satellite of nori."
 licences = ["Apache-2.0"]
 repository = { type = "github", user = "qwexvf", repo = "nori_asyncapi" }

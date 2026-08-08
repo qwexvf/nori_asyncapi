@@ -58,6 +58,144 @@ fn banner(spec: AsyncCodegenIR) -> String {
   <> "\n"
 }
 
+// ---------------------------------------------------------------------------
+// Gateway transport
+//
+// One WebSocket multiplexing every channel via a `{ "type", "payload" }`
+// envelope — the wire format the generated Gleam server dispatcher speaks. Use
+// this instead of the per-channel `generate` when the server is a single /ws
+// gateway. Direction is still inverted to the client's view: a server `send`
+// message becomes an `on*` subscription, a server `receive` becomes a `send*`.
+// ---------------------------------------------------------------------------
+
+type GatewayMethod {
+  GwSubscribe(method: String, msg_type: String, payload: String)
+  GwPublish(method: String, msg_type: String, payload: String)
+}
+
+/// Generate a single gateway client (payload types + one multiplexing client).
+pub fn generate_gateway(spec: AsyncCodegenIR) -> String {
+  let types = spec.types |> list.map(type_def_to_ts) |> string.join("\n\n")
+  let methods =
+    spec.channels
+    |> list.flat_map(gateway_methods)
+    |> dedupe_gateway
+    |> list.map(render_gateway_method)
+    |> string.join("\n\n")
+
+  [banner(spec), types, gateway_runtime(methods)]
+  |> list.filter(fn(s) { s != "" })
+  |> string.join("\n\n")
+}
+
+fn gateway_methods(ch: ChannelIR) -> List(GatewayMethod) {
+  ch.operations
+  |> list.flat_map(fn(op) {
+    list.map(op.messages, fn(msg) {
+      let method_suffix = to_pascal(msg.name)
+      let payload = type_ref_to_ts(msg.payload)
+      case op.action {
+        ir.Send -> GwSubscribe("on" <> method_suffix, msg.name, payload)
+        ir.Receive -> GwPublish("send" <> method_suffix, msg.name, payload)
+      }
+    })
+  })
+}
+
+fn dedupe_gateway(methods: List(GatewayMethod)) -> List(GatewayMethod) {
+  methods
+  |> list.fold(#([], []), fn(acc, m) {
+    let #(seen, out) = acc
+    let name = case m {
+      GwSubscribe(method:, ..) -> method
+      GwPublish(method:, ..) -> method
+    }
+    case list.contains(seen, name) {
+      True -> acc
+      False -> #([name, ..seen], [m, ..out])
+    }
+  })
+  |> fn(acc) { list.reverse(acc.1) }
+}
+
+fn render_gateway_method(m: GatewayMethod) -> String {
+  case m {
+    GwSubscribe(method:, msg_type:, payload:) ->
+      "  /** Subscribe to `"
+      <> msg_type
+      <> "` messages. Returns an unsubscribe function. */\n"
+      <> "  "
+      <> method
+      <> "(handler: (msg: "
+      <> payload
+      <> ") => void): () => void {\n"
+      <> "    return this.subscribe(\""
+      <> msg_type
+      <> "\", handler as (p: unknown) => void);\n"
+      <> "  }"
+    GwPublish(method:, msg_type:, payload:) ->
+      "  /** Publish a `"
+      <> msg_type
+      <> "` message. */\n"
+      <> "  "
+      <> method
+      <> "(msg: "
+      <> payload
+      <> "): void {\n"
+      <> "    this.publish(\""
+      <> msg_type
+      <> "\", msg);\n"
+      <> "  }"
+  }
+}
+
+fn gateway_runtime(methods: String) -> String {
+  "export class GatewayClient {
+  private ws: WebSocket;
+  private handlers = new Map<string, Set<(p: unknown) => void>>();
+
+  constructor(url: string) {
+    this.ws = new WebSocket(url);
+    this.ws.addEventListener(\"message\", (e) => {
+      let env: { type?: string; payload?: unknown };
+      try {
+        env = JSON.parse(e.data);
+      } catch {
+        return;
+      }
+      if (!env.type) return;
+      this.handlers.get(env.type)?.forEach((h) => h(env.payload));
+    });
+  }
+
+  /** Connect to a gateway URL (add any auth/query params to `url`). */
+  static connect(url: string): GatewayClient {
+    return new GatewayClient(url);
+  }
+
+  private subscribe(type: string, handler: (p: unknown) => void): () => void {
+    let set = this.handlers.get(type);
+    if (!set) {
+      set = new Set();
+      this.handlers.set(type, set);
+    }
+    set.add(handler);
+    return () => {
+      set.delete(handler);
+    };
+  }
+
+  private publish(type: string, payload: unknown): void {
+    this.ws.send(JSON.stringify({ type, payload }));
+  }
+
+  close(): void {
+    this.ws.close();
+  }
+
+" <> methods <> "\n}"
+}
+
 /// The `import { ... } from client_module` line for the stores file — each
 /// subscribed channel's class plus the named types its payloads reference
 /// (primitives and arrays need no import).

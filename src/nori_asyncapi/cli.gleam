@@ -112,15 +112,25 @@ fn write_typescript(cfg: Config, spec) -> Nil {
     None -> Nil
     Some(t) -> {
       let _ = simplifile.create_directory_all(t.dir)
-      write(t.dir <> "/client.ts", nori_asyncapi.generate_typescript(spec))
-      case t.stores {
-        False -> Nil
-        True -> {
-          let _ = simplifile.create_directory_all(t.stores_dir)
+      case t.transport {
+        "gateway" ->
+          // one multiplexing client; channel-style stores don't apply
           write(
-            t.stores_dir <> "/stores.ts",
-            nori_asyncapi.generate_typescript_stores(spec, t.client_module),
+            t.dir <> "/client.ts",
+            nori_asyncapi.generate_typescript_gateway(spec),
           )
+        _ -> {
+          write(t.dir <> "/client.ts", nori_asyncapi.generate_typescript(spec))
+          case t.stores {
+            False -> Nil
+            True -> {
+              let _ = simplifile.create_directory_all(t.stores_dir)
+              write(
+                t.stores_dir <> "/stores.ts",
+                nori_asyncapi.generate_typescript_stores(spec, t.client_module),
+              )
+            }
+          }
         }
       }
     }

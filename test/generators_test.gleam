@@ -94,6 +94,31 @@ pub fn ts_bidirectional_channel_has_both_directions_test() {
   has(ts, "export type PresenceStatus =") |> should.be_true
 }
 
+fn gateway_of(spec: String) -> String {
+  let assert Ok(doc) = nori_asyncapi.parse_yaml(spec)
+  nori_asyncapi.build_ir(doc) |> nori_asyncapi.generate_typescript_gateway
+}
+
+pub fn gateway_multiplexes_over_one_client_test() {
+  let ts = gateway_of(fixtures.ws_counts)
+  // single client, envelope publish/subscribe helpers
+  has(ts, "export class GatewayClient {") |> should.be_true
+  has(ts, "JSON.stringify({ type, payload })") |> should.be_true
+  // server `send` (onCounts) -> client subscribe by message type
+  has(ts, "onCountUpdate(handler: (msg: CountUpdate) => void): () => void")
+  |> should.be_true
+  has(ts, "this.subscribe(\"CountUpdate\"") |> should.be_true
+}
+
+pub fn gateway_publish_for_client_send_test() {
+  let assert Ok(doc) = nori_asyncapi.parse_file("examples/chat.yaml")
+  let ts =
+    nori_asyncapi.build_ir(doc) |> nori_asyncapi.generate_typescript_gateway
+  // chat's sendChat is a server receive -> client publishes with envelope type
+  has(ts, "sendChatSent(msg: ChatSent): void") |> should.be_true
+  has(ts, "this.publish(\"ChatSent\", msg)") |> should.be_true
+}
+
 fn stores_of(spec: String) -> String {
   let assert Ok(doc) = nori_asyncapi.parse_yaml(spec)
   nori_asyncapi.build_ir(doc)

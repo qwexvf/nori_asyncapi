@@ -52,6 +52,14 @@ pub fn generate_typescript(spec: AsyncCodegenIR) -> String {
   typescript.generate(spec)
 }
 
+/// Generate a gateway TypeScript client: one WebSocket multiplexing all
+/// channels via a `{type,payload}` envelope — the format the generated Gleam
+/// server dispatcher speaks. Use instead of `generate_typescript` when the
+/// server is a single `/ws` gateway.
+pub fn generate_typescript_gateway(spec: AsyncCodegenIR) -> String {
+  typescript.generate_gateway(spec)
+}
+
 /// Generate the neutral TypeScript store layer — one `useSyncExternalStore`-
 /// compatible observable per subscribe message. `client_module` is the import
 /// path of the client module (e.g. `"./client"`). Imports no UI framework.
