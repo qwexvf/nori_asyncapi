@@ -1,0 +1,18 @@
+name = "nori_asyncapi"
+version = "0.1.0"
+description = "AsyncAPI 3.x code generation for Gleam — parse specs, generate types, channels, and WS/SSE handlers. Satellite of nori."
+licences = ["Apache-2.0"]
+repository = { type = "github", user = "qwexvf", repo = "nori_asyncapi" }
+gleam = ">= 1.15.0"
+
+[dependencies]
+gleam_stdlib = ">= 0.44.0 and < 2.0.0"
+gleam_json = ">= 3.1.0 and < 4.0.0"
+nori = ">= 1.5.0 and < 2.0.0"
+taffy = ">= 1.0.0 and < 2.0.0"
+simplifile = ">= 2.4.0 and < 3.0.0"
+argv = ">= 1.0.2 and < 2.0.0"
+glint = ">= 1.0.0 and < 2.0.0"
+
+[dev_dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"

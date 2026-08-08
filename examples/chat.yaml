@@ -1,0 +1,133 @@
+asyncapi: 3.0.0
+info:
+  title: Chat
+  version: 1.0.0
+  description: Room-based chat — send/edit/delete messages, receive presence and events.
+defaultContentType: application/json
+servers:
+  gateway:
+    host: chat.example.com
+    protocol: wss
+    description: WebSocket chat gateway.
+channels:
+  room:
+    address: rooms/{roomId}
+    description: A single chat room.
+    parameters:
+      roomId:
+        description: The room identifier.
+    messages:
+      chatSent:
+        $ref: '#/components/messages/ChatSent'
+      chatEdited:
+        $ref: '#/components/messages/ChatEdited'
+      chatDeleted:
+        $ref: '#/components/messages/ChatDeleted'
+      presence:
+        $ref: '#/components/messages/Presence'
+      roomEvent:
+        $ref: '#/components/messages/RoomEvent'
+operations:
+  # client → server (server receives)
+  sendChat:
+    action: receive
+    channel:
+      $ref: '#/channels/room'
+    messages:
+      - $ref: '#/channels/room/messages/chatSent'
+  editChat:
+    action: receive
+    channel:
+      $ref: '#/channels/room'
+    messages:
+      - $ref: '#/channels/room/messages/chatEdited'
+  deleteChat:
+    action: receive
+    channel:
+      $ref: '#/channels/room'
+    messages:
+      - $ref: '#/channels/room/messages/chatDeleted'
+  # server → client (server sends)
+  onPresence:
+    action: send
+    channel:
+      $ref: '#/channels/room'
+    messages:
+      - $ref: '#/channels/room/messages/presence'
+  onRoomEvent:
+    action: send
+    channel:
+      $ref: '#/channels/room'
+    messages:
+      - $ref: '#/channels/room/messages/roomEvent'
+components:
+  messages:
+    ChatSent:
+      name: ChatSent
+      payload:
+        type: object
+        required:
+          - user
+          - text
+        properties:
+          user:
+            type: string
+          text:
+            type: string
+          replyTo:
+            type: string
+    ChatEdited:
+      name: ChatEdited
+      payload:
+        type: object
+        required:
+          - messageId
+          - text
+        properties:
+          messageId:
+            type: string
+          text:
+            type: string
+    ChatDeleted:
+      name: ChatDeleted
+      payload:
+        type: object
+        required:
+          - messageId
+        properties:
+          messageId:
+            type: string
+    Presence:
+      name: Presence
+      payload:
+        type: object
+        required:
+          - user
+          - status
+        properties:
+          user:
+            type: string
+          status:
+            $ref: '#/components/schemas/PresenceStatus'
+    RoomEvent:
+      name: RoomEvent
+      payload:
+        type: object
+        required:
+          - kind
+          - at
+        properties:
+          kind:
+            type: string
+          at:
+            type: string
+            format: date-time
+          detail:
+            type: string
+  schemas:
+    PresenceStatus:
+      type: string
+      enum:
+        - online
+        - away
+        - offline

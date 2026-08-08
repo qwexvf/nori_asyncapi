@@ -1,0 +1,37 @@
+# asyncapi.config.yaml — configuration for nori_asyncapi code generation.
+#
+# Place in your project root. The CLI auto-detects `asyncapi.config.yaml`, or
+# pass `--config=path/to/config.yaml`. With no config, positional args still
+# work: `generate <spec> [out-dir] [--stores]`.
+#
+# Minimal:
+#   spec: ./asyncapi.yaml
+
+# Path to the AsyncAPI spec (YAML or JSON).
+spec: ./examples/chat.yaml
+
+# Per-target output. Both targets run unless `enabled: false`. The point of the
+# config is that the two targets rarely share a directory: the TypeScript client
+# belongs in a frontend project, the Gleam handlers in a backend one.
+output:
+  # Gleam server-side code.
+  #   types.gleam    — payload records/enums + JSON codecs (via nori's emitter)
+  #   handlers.gleam — handle_* stubs (client→server) and emit_* (server→client)
+  gleam:
+    enabled: true
+    dir: ./backend/src/generated
+    # Import path handlers.gleam uses for the types module. Set this when
+    # types.gleam lives in a different Gleam project than handlers.gleam.
+    types_module: generated/types
+
+  # TypeScript client (framework-neutral).
+  #   client.ts — payload interfaces, transport runtime, per-channel classes
+  #   stores.ts — (when stores: true) useSyncExternalStore-shaped observables
+  typescript:
+    enabled: true
+    dir: ./frontend/src/api
+    stores: true
+    # Where stores.ts goes; defaults to `dir` when omitted.
+    stores_dir: ./frontend/src/api
+    # Import path stores.ts uses to reach the client module.
+    client_module: ./client
