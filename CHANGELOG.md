@@ -17,6 +17,9 @@
   `emit_*` `todo` stubs (they duplicated `send_*`) and emits only the imports it
   uses; `server.gleam` no longer imports `gleam/dynamic/decode` when there is no
   dispatcher (#3).
+- Send-only specs no longer emit an empty `handlers.gleam` with a dangling
+  `types` import: the CLI skips the file entirely when there are no handlers to
+  stub (#6).
 
 ### Added
 
