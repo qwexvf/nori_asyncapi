@@ -161,6 +161,7 @@ fn gateway_runtime(methods: String) -> String {
       try {
         env = JSON.parse(e.data);
       } catch {
+        console.warn(\"[asyncapi] dropping unparseable frame:\", e.data);
         return;
       }
       if (!env.type) return;
@@ -396,6 +397,17 @@ export class EventSourceTransport implements Transport {
   close(): void {
     this.es.close();
   }
+}
+
+/** Parse a `{ type, payload }` envelope frame. Returns undefined on malformed
+ * JSON — logged, not thrown, so one bad frame does not tear down the stream. */
+function parseFrame(data: string): { type?: string; payload?: unknown } | undefined {
+  try {
+    return JSON.parse(data);
+  } catch {
+    console.warn(\"[asyncapi] dropping unparseable frame:\", data);
+    return undefined;
+  }
 }"
 }
 
@@ -602,16 +614,10 @@ fn render_method(m: Method) -> String {
       <> payload
       <> ") => void): () => void {\n"
       <> "    return this.transport.subscribe((data) => {\n"
-      <> "      let env: { type?: string; payload?: unknown };\n"
-      <> "      try {\n"
-      <> "        env = JSON.parse(data);\n"
-      <> "      } catch {\n"
-      <> "        return;\n"
-      <> "      }\n"
-      <> "      if (env.type !== \""
+      <> "      const env = parseFrame(data);\n"
+      <> "      if (env?.type === \""
       <> wire_type
-      <> "\") return;\n"
-      <> "      handler(env.payload as "
+      <> "\") handler(env.payload as "
       <> payload
       <> ");\n"
       <> "    });\n"

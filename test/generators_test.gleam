@@ -44,17 +44,20 @@ pub fn ts_subscribe_unwraps_envelope_payload_test() {
   // client must read the server's { type, payload } envelope, not blind-cast
   // the whole frame (issue #1)
   let ts = ts_of(fixtures.ws_counts)
-  has(ts, "env = JSON.parse(data)") |> should.be_true
-  has(ts, "if (env.type !== \"CountUpdate\") return;") |> should.be_true
-  has(ts, "handler(env.payload as CountUpdate)") |> should.be_true
+  has(ts, "function parseFrame(data: string)") |> should.be_true
+  has(ts, "const env = parseFrame(data);") |> should.be_true
+  has(ts, "if (env?.type === \"CountUpdate\") handler(env.payload as CountUpdate)")
+  |> should.be_true
 }
 
 pub fn ts_multi_message_channel_demuxes_by_type_test() {
   // a channel with two `send` messages must guard each handler on its own
   // wire type so frames are not delivered to the wrong on* (issue #2)
   let ts = ts_of(fixtures.multi_send)
-  has(ts, "if (env.type !== \"Alpha\") return;") |> should.be_true
-  has(ts, "if (env.type !== \"Beta\") return;") |> should.be_true
+  has(ts, "if (env?.type === \"Alpha\") handler(env.payload as Alpha)")
+  |> should.be_true
+  has(ts, "if (env?.type === \"Beta\") handler(env.payload as Beta)")
+  |> should.be_true
 }
 
 pub fn ts_server_receive_becomes_client_publish_test() {

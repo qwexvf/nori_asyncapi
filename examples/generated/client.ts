@@ -75,6 +75,17 @@ export class EventSourceTransport implements Transport {
   }
 }
 
+/** Parse a `{ type, payload }` envelope frame. Returns undefined on malformed
+ * JSON — logged, not thrown, so one bad frame does not tear down the stream. */
+function parseFrame(data: string): { type?: string; payload?: unknown } | undefined {
+  try {
+    return JSON.parse(data);
+  } catch {
+    console.warn("[asyncapi] dropping unparseable frame:", data);
+    return undefined;
+  }
+}
+
 /** Channel address: rooms/{roomId} */
 export class RoomChannel {
   private constructor(private readonly transport: Transport) {}
@@ -96,28 +107,16 @@ export class RoomChannel {
   /** Subscribe to `Presence` messages. Returns an unsubscribe function. */
   onPresence(handler: (msg: Presence) => void): () => void {
     return this.transport.subscribe((data) => {
-      let env: { type?: string; payload?: unknown };
-      try {
-        env = JSON.parse(data);
-      } catch {
-        return;
-      }
-      if (env.type !== "Presence") return;
-      handler(env.payload as Presence);
+      const env = parseFrame(data);
+      if (env?.type === "Presence") handler(env.payload as Presence);
     });
   }
 
   /** Subscribe to `RoomEvent` messages. Returns an unsubscribe function. */
   onRoomEvent(handler: (msg: RoomEvent) => void): () => void {
     return this.transport.subscribe((data) => {
-      let env: { type?: string; payload?: unknown };
-      try {
-        env = JSON.parse(data);
-      } catch {
-        return;
-      }
-      if (env.type !== "RoomEvent") return;
-      handler(env.payload as RoomEvent);
+      const env = parseFrame(data);
+      if (env?.type === "RoomEvent") handler(env.payload as RoomEvent);
     });
   }
 
