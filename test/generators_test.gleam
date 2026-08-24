@@ -64,10 +64,28 @@ pub fn ts_multi_message_channel_demuxes_by_type_test() {
 }
 
 pub fn ts_server_receive_becomes_client_publish_test() {
-  // server `receive` (onPing) → client publishes with a send* method
+  // server `receive` (onPing) → client publishes with a send* method, wrapping
+  // the payload in the { type, payload } envelope the server dispatcher decodes
+  // (mirror of the subscribe direction — not a raw JSON.stringify(msg))
   let ts = ts_of(fixtures.inline_primitive)
   has(ts, "sendPing(msg: string): void") |> should.be_true
-  has(ts, "this.transport.send(JSON.stringify(msg))") |> should.be_true
+  has(
+    ts,
+    "this.transport.send(JSON.stringify({ type: \"ping\", payload: msg }))",
+  )
+  |> should.be_true
+}
+
+pub fn ts_publish_envelope_matches_server_dispatch_test() {
+  // the type the client stamps when publishing must equal the arm the server
+  // dispatcher routes on, or publishes decode to BadEnvelope
+  let assert Ok(doc) = nori_asyncapi.parse_file("examples/chat.yaml")
+  let ir = nori_asyncapi.build_ir(doc)
+  let ts = nori_asyncapi.generate_typescript(ir)
+  let server = nori_asyncapi.generate_gleam_server(ir, "generated/types")
+  has(ts, "JSON.stringify({ type: \"ChatSent\", payload: msg })")
+  |> should.be_true
+  has(server, "\"ChatSent\" ->") |> should.be_true
 }
 
 pub fn ts_ws_server_connects_over_websocket_test() {
@@ -253,12 +271,26 @@ pub fn server_no_send_has_no_sse_resume_test() {
 
 pub fn gleam_send_op_emits_no_handler_test() {
   // send-only channel has nothing to handle: no `emit_*` stub (that duplicates
-  // the server's `send_*` encoder) and no unused imports.
+  // the server's `send_*` encoder) and no imports at all — not even `types`,
+  // which nothing would reference (issue #6)
   let code = gleam_of(fixtures.ws_counts)
   has(code, "emit_") |> should.be_false
   has(code, "No `receive` operations") |> should.be_true
   has(code, "import gleam/dict") |> should.be_false
   has(code, "import gleam/option") |> should.be_false
+  has(code, "as types") |> should.be_false
+}
+
+pub fn gleam_handlers_present_test() {
+  // the predicate the CLI uses to skip writing an empty handlers.gleam (issue #6)
+  let assert Ok(send_only) = nori_asyncapi.parse_yaml(fixtures.ws_counts)
+  nori_asyncapi.build_ir(send_only)
+  |> nori_asyncapi.gleam_handlers_present
+  |> should.be_false
+  let assert Ok(has_recv) = nori_asyncapi.parse_yaml(fixtures.inline_primitive)
+  nori_asyncapi.build_ir(has_recv)
+  |> nori_asyncapi.gleam_handlers_present
+  |> should.be_true
 }
 
 pub fn gleam_receive_op_emits_handler_test() {

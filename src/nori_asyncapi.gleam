@@ -85,6 +85,13 @@ pub fn generate_gleam_handlers(
   gleam_handlers.generate(spec, types_module)
 }
 
+/// Whether `generate_gleam_handlers` would produce any handler stubs. A
+/// send-only spec has none, so `handlers.gleam` should be skipped rather than
+/// written as an empty module (which warns on `gleam build`).
+pub fn gleam_handlers_present(spec: AsyncCodegenIR) -> Bool {
+  gleam_handlers.has_handlers(spec)
+}
+
 /// Generate the Gleam server dispatcher — a transport-neutral runtime that
 /// decodes incoming `{type, payload}` frames into typed handler calls and
 /// encodes outgoing messages. `types_module` is the import path of the
