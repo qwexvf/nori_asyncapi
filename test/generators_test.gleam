@@ -64,10 +64,28 @@ pub fn ts_multi_message_channel_demuxes_by_type_test() {
 }
 
 pub fn ts_server_receive_becomes_client_publish_test() {
-  // server `receive` (onPing) → client publishes with a send* method
+  // server `receive` (onPing) → client publishes with a send* method, wrapping
+  // the payload in the { type, payload } envelope the server dispatcher decodes
+  // (mirror of the subscribe direction — not a raw JSON.stringify(msg))
   let ts = ts_of(fixtures.inline_primitive)
   has(ts, "sendPing(msg: string): void") |> should.be_true
-  has(ts, "this.transport.send(JSON.stringify(msg))") |> should.be_true
+  has(
+    ts,
+    "this.transport.send(JSON.stringify({ type: \"ping\", payload: msg }))",
+  )
+  |> should.be_true
+}
+
+pub fn ts_publish_envelope_matches_server_dispatch_test() {
+  // the type the client stamps when publishing must equal the arm the server
+  // dispatcher routes on, or publishes decode to BadEnvelope
+  let assert Ok(doc) = nori_asyncapi.parse_file("examples/chat.yaml")
+  let ir = nori_asyncapi.build_ir(doc)
+  let ts = nori_asyncapi.generate_typescript(ir)
+  let server = nori_asyncapi.generate_gleam_server(ir, "generated/types")
+  has(ts, "JSON.stringify({ type: \"ChatSent\", payload: msg })")
+  |> should.be_true
+  has(server, "\"ChatSent\" ->") |> should.be_true
 }
 
 pub fn ts_ws_server_connects_over_websocket_test() {

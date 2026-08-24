@@ -9,6 +9,10 @@
   fields are no longer `undefined` (#1). Each `on*` handler also guards on the
   message `type`, so a channel with more than one `send` message demultiplexes
   correctly instead of delivering every frame to every handler (#2).
+- Per-channel client `send*` (publish) now wraps the payload in the same
+  `{type,payload}` envelope, matching what the Gleam `dispatch` decodes — the
+  publish-direction mirror of #1. Previously it sent the raw payload, so every
+  client publish decoded to `BadEnvelope` on the server.
 - Send-only specs no longer generate dead Gleam: `handlers.gleam` drops the
   `emit_*` `todo` stubs (they duplicated `send_*`) and emits only the imports it
   uses; `server.gleam` no longer imports `gleam/dynamic/decode` when there is no

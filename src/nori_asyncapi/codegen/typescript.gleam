@@ -421,8 +421,10 @@ type Method {
   /// `wire_type` is the message name the server stamps into the envelope's
   /// `type` field, used to demux frames on a multi-message channel.
   Subscribe(method: String, wire_type: String, payload: String)
-  /// client publishes (server `receive`): `send<Msg>(msg): void`
-  Publish(method: String, payload: String)
+  /// client publishes (server `receive`): `send<Msg>(msg): void`.
+  /// `wire_type` is the message name stamped into the envelope's `type` field so
+  /// the server dispatcher can route it — the mirror of `Subscribe`.
+  Publish(method: String, wire_type: String, payload: String)
 }
 
 fn channel_to_ts(ch: ChannelIR, default: Transport) -> String {
@@ -598,7 +600,7 @@ fn message_method(op: OperationIR, msg: MessageIR) -> Method {
     // server sends → client subscribes
     ir.Send -> Subscribe("on" <> msg_name, msg.name, payload)
     // server receives → client publishes
-    ir.Receive -> Publish("send" <> msg_name, payload)
+    ir.Receive -> Publish("send" <> msg_name, msg.name, payload)
   }
 }
 
@@ -622,7 +624,7 @@ fn render_method(m: Method) -> String {
       <> ");\n"
       <> "    });\n"
       <> "  }"
-    Publish(method:, payload:) ->
+    Publish(method:, wire_type:, payload:) ->
       "  /** Publish a `"
       <> payload
       <> "` message. */\n"
@@ -631,7 +633,9 @@ fn render_method(m: Method) -> String {
       <> "(msg: "
       <> payload
       <> "): void {\n"
-      <> "    this.transport.send(JSON.stringify(msg));\n"
+      <> "    this.transport.send(JSON.stringify({ type: \""
+      <> wire_type
+      <> "\", payload: msg }));\n"
       <> "  }"
   }
 }

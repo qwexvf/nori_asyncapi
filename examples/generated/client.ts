@@ -96,12 +96,12 @@ export class RoomChannel {
 
   /** Publish a `ChatDeleted` message. */
   sendChatDeleted(msg: ChatDeleted): void {
-    this.transport.send(JSON.stringify(msg));
+    this.transport.send(JSON.stringify({ type: "ChatDeleted", payload: msg }));
   }
 
   /** Publish a `ChatEdited` message. */
   sendChatEdited(msg: ChatEdited): void {
-    this.transport.send(JSON.stringify(msg));
+    this.transport.send(JSON.stringify({ type: "ChatEdited", payload: msg }));
   }
 
   /** Subscribe to `Presence` messages. Returns an unsubscribe function. */
@@ -122,7 +122,7 @@ export class RoomChannel {
 
   /** Publish a `ChatSent` message. */
   sendChatSent(msg: ChatSent): void {
-    this.transport.send(JSON.stringify(msg));
+    this.transport.send(JSON.stringify({ type: "ChatSent", payload: msg }));
   }
 
   close(): void {
