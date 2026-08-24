@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.4.1
+
+### Changed
+
+- Bumped the `nori` dependency to `>= 2.0.0 and < 3.0.0`. nori 2.0.0's breaking
+  changes (fetch target removal, generated-client body argument) do not affect
+  the schema seam this package uses; no change to generated output.
+
 ## v0.4.0
 
 ### Fixed
