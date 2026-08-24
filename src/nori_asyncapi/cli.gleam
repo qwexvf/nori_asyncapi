@@ -95,10 +95,16 @@ fn write_gleam(cfg: Config, spec) -> Nil {
     Some(t) -> {
       let _ = simplifile.create_directory_all(t.dir)
       write(t.dir <> "/types.gleam", nori_asyncapi.generate_gleam_types(spec))
-      write(
-        t.dir <> "/handlers.gleam",
-        nori_asyncapi.generate_gleam_handlers(spec, t.types_module),
-      )
+      // a send-only spec has no handlers to stub; skip the file rather than
+      // emit an empty module that warns on `gleam build`
+      case nori_asyncapi.gleam_handlers_present(spec) {
+        True ->
+          write(
+            t.dir <> "/handlers.gleam",
+            nori_asyncapi.generate_gleam_handlers(spec, t.types_module),
+          )
+        False -> Nil
+      }
       write(
         t.dir <> "/server.gleam",
         nori_asyncapi.generate_gleam_server(spec, t.types_module),

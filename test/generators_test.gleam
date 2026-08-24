@@ -271,12 +271,26 @@ pub fn server_no_send_has_no_sse_resume_test() {
 
 pub fn gleam_send_op_emits_no_handler_test() {
   // send-only channel has nothing to handle: no `emit_*` stub (that duplicates
-  // the server's `send_*` encoder) and no unused imports.
+  // the server's `send_*` encoder) and no imports at all — not even `types`,
+  // which nothing would reference (issue #6)
   let code = gleam_of(fixtures.ws_counts)
   has(code, "emit_") |> should.be_false
   has(code, "No `receive` operations") |> should.be_true
   has(code, "import gleam/dict") |> should.be_false
   has(code, "import gleam/option") |> should.be_false
+  has(code, "as types") |> should.be_false
+}
+
+pub fn gleam_handlers_present_test() {
+  // the predicate the CLI uses to skip writing an empty handlers.gleam (issue #6)
+  let assert Ok(send_only) = nori_asyncapi.parse_yaml(fixtures.ws_counts)
+  nori_asyncapi.build_ir(send_only)
+  |> nori_asyncapi.gleam_handlers_present
+  |> should.be_false
+  let assert Ok(has_recv) = nori_asyncapi.parse_yaml(fixtures.inline_primitive)
+  nori_asyncapi.build_ir(has_recv)
+  |> nori_asyncapi.gleam_handlers_present
+  |> should.be_true
 }
 
 pub fn gleam_receive_op_emits_handler_test() {
