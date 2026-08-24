@@ -47,8 +47,8 @@ From an AsyncAPI spec with a channel, messages, and operations:
 | `client.ts` | frontend | payload interfaces, a `Transport` runtime (WebSocket + SSE), one typed class per channel |
 | `stores.ts` | frontend (opt-in) | `useSyncExternalStore`-compatible observable per subscribe message |
 | `types.gleam` | backend | payload records/enums + JSON codecs (via nori's emitter) |
-| `handlers.gleam` | backend | `handle_*` stubs (client→server) and `emit_*` helpers (server→client) |
-| `server.gleam` | backend | transport-neutral dispatcher: decode incoming frames → typed handler callbacks, encode outgoing messages |
+| `handlers.gleam` | backend | `handle_*` stubs for incoming (client→server) messages |
+| `server.gleam` | backend | transport-neutral dispatcher: decode incoming frames → typed handler callbacks, `send_*` encoders for outgoing messages, plus SSE resume helpers |
 
 ### Example
 
@@ -83,7 +83,16 @@ export class RoomChannel {
 
   /** Subscribe to `Presence` messages. Returns an unsubscribe function. */
   onPresence(handler: (msg: Presence) => void): () => void {
-    return this.transport.subscribe((data) => handler(JSON.parse(data) as Presence));
+    return this.transport.subscribe((data) => {
+      let env: { type?: string; payload?: unknown };
+      try {
+        env = JSON.parse(data);
+      } catch {
+        return;
+      }
+      if (env.type !== "Presence") return;
+      handler(env.payload as Presence);
+    });
   }
 
   close(): void { this.transport.close(); }
@@ -95,10 +104,9 @@ Generated `handlers.gleam` (excerpt):
 ```gleam
 /// Handle `sendChat` arriving on `rooms/{roomId}`.
 pub fn handle_send_chat(msg: types.ChatSent) -> Nil { todo }
-
-/// Emit `onPresence` on `rooms/{roomId}`.
-pub fn emit_on_presence(msg: types.Presence) -> Nil { todo }
 ```
+
+Outgoing (`send`) messages are not stubbed here — encode them with the `send_*` functions in `server.gleam`.
 
 Full generated output for the chat spec lives in [`examples/generated/`](examples/generated).
 
@@ -129,6 +137,29 @@ let frame = server.send_presence(types.Presence(user: "ada", status: types.Onlin
 
 Outgoing `send_*` encoders and incoming handlers are split by direction, so the
 compiler stops you sending a receive-only message or handling a send-only one.
+
+### SSE resume
+
+A browser `EventSource` reconnects on its own and echoes the last event `id` it
+saw as the `Last-Event-ID` header. For any spec with `send` messages, `server.gleam`
+emits helpers so the server replays only what a client missed instead of the whole
+backlog: `sse_event(id, frame)` stamps the cursor onto a `send_*` frame, and
+`sse_backlog(resume, last_event_id)` renders the missed events for a reconnecting
+client. You supply the `SseResume.replay_from` lookup over your own event log.
+
+```gleam
+let resume =
+  server.SseResume(replay_from: fn(last_id) {
+    // return the events after `last_id` as #(id, frame) pairs, oldest first
+    my_event_log.since(last_id)
+  })
+
+// on (re)connect, before streaming live events:
+let backlog = server.sse_backlog(resume, last_event_id)
+
+// each live event carries its cursor:
+let frame = server.sse_event(id, server.send_presence(presence))
+```
 
 ## Using it in React
 

@@ -144,3 +144,51 @@ operations:
     messages:
       - $ref: '#/components/messages/DoesNotExist'
 "
+
+/// One channel with two `send` messages (Alpha, Beta) — must demux by type.
+pub const multi_send = "asyncapi: 3.0.0
+info:
+  title: Multi
+  version: 1.0.0
+servers:
+  rt:
+    host: rt.example.com
+    protocol: ws
+channels:
+  run:
+    address: run
+    messages:
+      a:
+        $ref: '#/components/messages/Alpha'
+      b:
+        $ref: '#/components/messages/Beta'
+operations:
+  onAlpha:
+    action: send
+    channel:
+      $ref: '#/channels/run'
+    messages:
+      - $ref: '#/channels/run/messages/a'
+  onBeta:
+    action: send
+    channel:
+      $ref: '#/channels/run'
+    messages:
+      - $ref: '#/channels/run/messages/b'
+components:
+  messages:
+    Alpha:
+      name: Alpha
+      payload:
+        type: object
+        properties:
+          a:
+            type: string
+    Beta:
+      name: Beta
+      payload:
+        type: object
+        properties:
+          b:
+            type: integer
+"

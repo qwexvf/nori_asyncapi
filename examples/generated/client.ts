@@ -95,12 +95,30 @@ export class RoomChannel {
 
   /** Subscribe to `Presence` messages. Returns an unsubscribe function. */
   onPresence(handler: (msg: Presence) => void): () => void {
-    return this.transport.subscribe((data) => handler(JSON.parse(data) as Presence));
+    return this.transport.subscribe((data) => {
+      let env: { type?: string; payload?: unknown };
+      try {
+        env = JSON.parse(data);
+      } catch {
+        return;
+      }
+      if (env.type !== "Presence") return;
+      handler(env.payload as Presence);
+    });
   }
 
   /** Subscribe to `RoomEvent` messages. Returns an unsubscribe function. */
   onRoomEvent(handler: (msg: RoomEvent) => void): () => void {
-    return this.transport.subscribe((data) => handler(JSON.parse(data) as RoomEvent));
+    return this.transport.subscribe((data) => {
+      let env: { type?: string; payload?: unknown };
+      try {
+        env = JSON.parse(data);
+      } catch {
+        return;
+      }
+      if (env.type !== "RoomEvent") return;
+      handler(env.payload as RoomEvent);
+    });
   }
 
   /** Publish a `ChatSent` message. */

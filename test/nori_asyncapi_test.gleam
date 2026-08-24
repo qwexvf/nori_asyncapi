@@ -93,7 +93,10 @@ pub fn gleam_handlers_gen_test() {
       "generated/types",
     )
 
-  // send op → emit_ stub
-  string.contains(code, "pub fn emit_on_counts") |> should.be_true
-  string.contains(code, "server.counts") |> should.be_true
+  // send-only spec → no handler stubs, no dead `emit_*`, no unused imports
+  string.contains(code, "emit_") |> should.be_false
+  string.contains(code, "No `receive` operations") |> should.be_true
+  string.contains(code, "import gleam/dict") |> should.be_false
+  string.contains(code, "import gleam/dynamic") |> should.be_false
+  string.contains(code, "import gleam/option") |> should.be_false
 }

@@ -40,6 +40,23 @@ pub fn ts_server_send_becomes_client_subscribe_test() {
   has(ts, "this.transport.subscribe") |> should.be_true
 }
 
+pub fn ts_subscribe_unwraps_envelope_payload_test() {
+  // client must read the server's { type, payload } envelope, not blind-cast
+  // the whole frame (issue #1)
+  let ts = ts_of(fixtures.ws_counts)
+  has(ts, "env = JSON.parse(data)") |> should.be_true
+  has(ts, "if (env.type !== \"CountUpdate\") return;") |> should.be_true
+  has(ts, "handler(env.payload as CountUpdate)") |> should.be_true
+}
+
+pub fn ts_multi_message_channel_demuxes_by_type_test() {
+  // a channel with two `send` messages must guard each handler on its own
+  // wire type so frames are not delivered to the wrong on* (issue #2)
+  let ts = ts_of(fixtures.multi_send)
+  has(ts, "if (env.type !== \"Alpha\") return;") |> should.be_true
+  has(ts, "if (env.type !== \"Beta\") return;") |> should.be_true
+}
+
 pub fn ts_server_receive_becomes_client_publish_test() {
   // server `receive` (onPing) → client publishes with a send* method
   let ts = ts_of(fixtures.inline_primitive)
@@ -201,14 +218,41 @@ pub fn server_no_receive_has_no_dispatch_test() {
   has(code, "pub fn dispatch(") |> should.be_false
   has(code, "No `receive` operations") |> should.be_true
   has(code, "pub fn send_count_update(") |> should.be_true
+  // `decode` is only used by the dispatcher, so a send-only spec must not
+  // import it (would warn on `gleam build`) — issue #3
+  has(code, "import gleam/dynamic/decode") |> should.be_false
+}
+
+pub fn server_send_emits_sse_resume_test() {
+  // send messages get SSE resume helpers: an id-stamped frame encoder and a
+  // backlog replay keyed on Last-Event-ID (issue #4)
+  let code = server_of(fixtures.ws_counts)
+  has(code, "pub type SseResume {") |> should.be_true
+  has(code, "replay_from: fn(Option(String)) -> List(#(String, String))")
+  |> should.be_true
+  has(code, "pub fn sse_event(id: String, frame: String) -> String {")
+  |> should.be_true
+  has(code, "pub fn sse_backlog(") |> should.be_true
+  has(code, "import gleam/option.{type Option}") |> should.be_true
+}
+
+pub fn server_no_send_has_no_sse_resume_test() {
+  // a receive-only spec streams nothing, so no SSE resume section
+  let code = server_of(fixtures.inline_primitive)
+  has(code, "SseResume") |> should.be_false
+  has(code, "sse_event") |> should.be_false
 }
 
 // --- Gleam handlers ---
 
-pub fn gleam_send_op_emits_emitter_test() {
+pub fn gleam_send_op_emits_no_handler_test() {
+  // send-only channel has nothing to handle: no `emit_*` stub (that duplicates
+  // the server's `send_*` encoder) and no unused imports.
   let code = gleam_of(fixtures.ws_counts)
-  has(code, "pub fn emit_on_counts(msg: types.CountUpdate) -> Nil {")
-  |> should.be_true
+  has(code, "emit_") |> should.be_false
+  has(code, "No `receive` operations") |> should.be_true
+  has(code, "import gleam/dict") |> should.be_false
+  has(code, "import gleam/option") |> should.be_false
 }
 
 pub fn gleam_receive_op_emits_handler_test() {
@@ -217,6 +261,7 @@ pub fn gleam_receive_op_emits_handler_test() {
 }
 
 pub fn gleam_channel_banner_test() {
-  let code = gleam_of(fixtures.ws_counts)
-  has(code, "// channel: server.counts") |> should.be_true
+  // banner appears for a channel that has receive handlers to render
+  let code = gleam_of(fixtures.inline_primitive)
+  has(code, "// channel: ") |> should.be_true
 }

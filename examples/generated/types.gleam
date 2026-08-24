@@ -11,7 +11,9 @@ pub type PresenceStatus {
   PresenceStatusOffline
 }
 
-pub fn presence_status_from_string(value: String) -> Result(PresenceStatus, Nil) {
+pub fn presence_status_from_string(
+  value: String,
+) -> Result(PresenceStatus, Nil) {
   case value {
     "online" -> gleam.Ok(PresenceStatusOnline)
     "away" -> gleam.Ok(PresenceStatusAway)
@@ -29,39 +31,23 @@ pub fn presence_status_to_string(value: PresenceStatus) -> String {
 }
 
 pub type ChatDeleted {
-  ChatDeleted(
-    message_id: String,
-  )
+  ChatDeleted(message_id: String)
 }
 
 pub type ChatEdited {
-  ChatEdited(
-    message_id: String,
-    text: String,
-  )
+  ChatEdited(message_id: String, text: String)
 }
 
 pub type Presence {
-  Presence(
-    status: PresenceStatus,
-    user: String,
-  )
+  Presence(status: PresenceStatus, user: String)
 }
 
 pub type RoomEvent {
-  RoomEvent(
-    at: String,
-    detail: Option(String),
-    kind: String,
-  )
+  RoomEvent(at: String, detail: Option(String), kind: String)
 }
 
 pub type ChatSent {
-  ChatSent(
-    reply_to: Option(String),
-    text: String,
-    user: String,
-  )
+  ChatSent(reply_to: Option(String), text: String, user: String)
 }
 
 pub fn presence_status_decoder() -> Decoder(PresenceStatus) {
@@ -91,13 +77,21 @@ pub fn presence_decoder() -> Decoder(Presence) {
 
 pub fn room_event_decoder() -> Decoder(RoomEvent) {
   use at <- decode.field("at", decode.string)
-  use detail <- decode.optional_field("detail", None, decode.optional(decode.string))
+  use detail <- decode.optional_field(
+    "detail",
+    None,
+    decode.optional(decode.string),
+  )
   use kind <- decode.field("kind", decode.string)
   decode.success(RoomEvent(at: at, detail: detail, kind: kind))
 }
 
 pub fn chat_sent_decoder() -> Decoder(ChatSent) {
-  use reply_to <- decode.optional_field("replyTo", None, decode.optional(decode.string))
+  use reply_to <- decode.optional_field(
+    "replyTo",
+    None,
+    decode.optional(decode.string),
+  )
   use text <- decode.field("text", decode.string)
   use user <- decode.field("user", decode.string)
   decode.success(ChatSent(reply_to: reply_to, text: text, user: user))
