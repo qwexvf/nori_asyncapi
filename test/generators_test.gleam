@@ -46,7 +46,10 @@ pub fn ts_subscribe_unwraps_envelope_payload_test() {
   let ts = ts_of(fixtures.ws_counts)
   has(ts, "function parseFrame(data: string)") |> should.be_true
   has(ts, "const env = parseFrame(data);") |> should.be_true
-  has(ts, "if (env?.type === \"CountUpdate\") handler(env.payload as CountUpdate)")
+  has(
+    ts,
+    "if (env?.type === \"CountUpdate\") handler(env.payload as CountUpdate)",
+  )
   |> should.be_true
 }
 
