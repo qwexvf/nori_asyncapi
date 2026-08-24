@@ -1,10 +1,11 @@
 //// Gleam handler-stub generator for AsyncAPI.
 ////
-//// Emits one handler-stub function per operation, grouped by channel. `receive`
-//// operations become `handle_*` stubs (messages arriving from the client);
-//// `send` operations become `emit_*` helpers (messages the app pushes out).
-//// Payload types are referenced by name — generate them with nori's Gleam type
-//// generator from the same schemas.
+//// Emits one handler-stub function per `receive` operation, grouped by channel.
+//// `receive` operations (messages arriving from the client) become `handle_*`
+//// stubs. `send` operations are the server's outgoing messages — encode those
+//// with the `send_*` functions in the generated server module, not here — so
+//// they contribute nothing to this file. Payload types are referenced by name;
+//// generate them with nori's Gleam type generator from the same schemas.
 
 import gleam/list
 import gleam/string
@@ -18,10 +19,18 @@ import nori_asyncapi/ir.{type AsyncCodegenIR, type ChannelIR, type OperationIR}
 /// `generate_gleam_types` (e.g. `"generated/types"`); named payload types are
 /// referenced through its `types` alias.
 pub fn generate(spec: AsyncCodegenIR, types_module: String) -> String {
+  let channels =
+    spec.channels
+    |> list.filter_map(channel_to_gleam)
+    |> string.join("\n\n")
+
+  // Only import what the generated stubs actually reference, so a spec with no
+  // `receive` operations (or only primitive payloads) does not emit unused
+  // imports that `gleam build` would warn on.
   let imports =
-    "import gleam/dict.{type Dict}\n"
-    <> "import gleam/dynamic.{type Dynamic}\n"
-    <> "import gleam/option.{type Option}\n"
+    import_if(contains(channels, "Dict("), "gleam/dict.{type Dict}")
+    <> import_if(contains(channels, "Dynamic"), "gleam/dynamic.{type Dynamic}")
+    <> import_if(contains(channels, "Option("), "gleam/option.{type Option}")
     <> "import "
     <> types_module
     <> " as types\n"
@@ -36,59 +45,62 @@ pub fn generate(spec: AsyncCodegenIR, types_module: String) -> String {
     <> imports
     <> "\n"
 
-  let channels =
-    spec.channels
-    |> list.map(channel_to_gleam)
-    |> string.join("\n\n")
+  let body = case channels {
+    "" -> "// No `receive` operations — nothing to handle.\n"
+    _ -> channels <> "\n"
+  }
 
-  header <> channels <> "\n"
+  header <> body
 }
 
-fn channel_to_gleam(ch: ChannelIR) -> String {
-  let banner =
-    "// ---------------------------------------------------------------------------\n"
-    <> "// channel: "
-    <> ch.address
-    <> "\n"
-    <> "// ---------------------------------------------------------------------------\n"
-  let ops =
+fn contains(haystack: String, needle: String) -> Bool {
+  string.contains(does: haystack, contain: needle)
+}
+
+fn import_if(needed: Bool, module: String) -> String {
+  case needed {
+    True -> "import " <> module <> "\n"
+    False -> ""
+  }
+}
+
+/// Returns `Error(Nil)` for channels with no `receive` operations so they are
+/// dropped entirely — a send-only channel has nothing to handle here.
+fn channel_to_gleam(ch: ChannelIR) -> Result(String, Nil) {
+  let handlers =
     ch.operations
+    |> list.filter(fn(op) { op.action == ir.Receive })
     |> list.map(fn(op) { operation_to_gleam(ch, op) })
-    |> string.join("\n\n")
-  banner <> ops
+
+  case handlers {
+    [] -> Error(Nil)
+    _ -> {
+      let banner =
+        "// ---------------------------------------------------------------------------\n"
+        <> "// channel: "
+        <> ch.address
+        <> "\n"
+        <> "// ---------------------------------------------------------------------------\n"
+      Ok(banner <> string.join(handlers, "\n\n"))
+    }
+  }
 }
 
 fn operation_to_gleam(ch: ChannelIR, op: OperationIR) -> String {
   let fn_name = naming.to_snake_case(op.operation_id)
   let payload = payload_type(op)
-  case op.action {
-    ir.Receive ->
-      "/// Handle `"
-      <> op.operation_id
-      <> "` arriving on `"
-      <> ch.address
-      <> "`.\n"
-      <> "pub fn handle_"
-      <> fn_name
-      <> "(msg: "
-      <> payload
-      <> ") -> Nil {\n"
-      <> "  todo\n"
-      <> "}"
-    ir.Send ->
-      "/// Emit `"
-      <> op.operation_id
-      <> "` on `"
-      <> ch.address
-      <> "`.\n"
-      <> "pub fn emit_"
-      <> fn_name
-      <> "(msg: "
-      <> payload
-      <> ") -> Nil {\n"
-      <> "  todo\n"
-      <> "}"
-  }
+  "/// Handle `"
+  <> op.operation_id
+  <> "` arriving on `"
+  <> ch.address
+  <> "`.\n"
+  <> "pub fn handle_"
+  <> fn_name
+  <> "(msg: "
+  <> payload
+  <> ") -> Nil {\n"
+  <> "  todo\n"
+  <> "}"
 }
 
 fn payload_type(op: OperationIR) -> String {

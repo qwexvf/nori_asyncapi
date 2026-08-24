@@ -161,6 +161,7 @@ fn gateway_runtime(methods: String) -> String {
       try {
         env = JSON.parse(e.data);
       } catch {
+        console.warn(\"[asyncapi] dropping unparseable frame:\", e.data);
         return;
       }
       if (!env.type) return;
@@ -396,6 +397,17 @@ export class EventSourceTransport implements Transport {
   close(): void {
     this.es.close();
   }
+}
+
+/** Parse a `{ type, payload }` envelope frame. Returns undefined on malformed
+ * JSON — logged, not thrown, so one bad frame does not tear down the stream. */
+function parseFrame(data: string): { type?: string; payload?: unknown } | undefined {
+  try {
+    return JSON.parse(data);
+  } catch {
+    console.warn(\"[asyncapi] dropping unparseable frame:\", data);
+    return undefined;
+  }
 }"
 }
 
@@ -405,8 +417,10 @@ export class EventSourceTransport implements Transport {
 
 /// A method to emit on a channel class — resolved to the client's perspective.
 type Method {
-  /// client receives (server `send`): `on<Msg>(handler): () => void`
-  Subscribe(method: String, payload: String)
+  /// client receives (server `send`): `on<Msg>(handler): () => void`.
+  /// `wire_type` is the message name the server stamps into the envelope's
+  /// `type` field, used to demux frames on a multi-message channel.
+  Subscribe(method: String, wire_type: String, payload: String)
   /// client publishes (server `receive`): `send<Msg>(msg): void`
   Publish(method: String, payload: String)
 }
@@ -459,7 +473,7 @@ fn channel_stores(ch: ChannelIR) -> List(String) {
   |> dedupe_methods
   |> list.filter_map(fn(m) {
     case m {
-      Subscribe(method:, payload:) ->
+      Subscribe(method:, payload:, ..) ->
         Ok(store_factory(class_name, method, payload, has_params, params_type))
       Publish(..) -> Error(Nil)
     }
@@ -582,7 +596,7 @@ fn message_method(op: OperationIR, msg: MessageIR) -> Method {
   let msg_name = to_pascal(msg.name)
   case op.action {
     // server sends → client subscribes
-    ir.Send -> Subscribe("on" <> msg_name, payload)
+    ir.Send -> Subscribe("on" <> msg_name, msg.name, payload)
     // server receives → client publishes
     ir.Receive -> Publish("send" <> msg_name, payload)
   }
@@ -590,7 +604,7 @@ fn message_method(op: OperationIR, msg: MessageIR) -> Method {
 
 fn render_method(m: Method) -> String {
   case m {
-    Subscribe(method:, payload:) ->
+    Subscribe(method:, wire_type:, payload:) ->
       "  /** Subscribe to `"
       <> payload
       <> "` messages. Returns an unsubscribe function. */\n"
@@ -599,9 +613,14 @@ fn render_method(m: Method) -> String {
       <> "(handler: (msg: "
       <> payload
       <> ") => void): () => void {\n"
-      <> "    return this.transport.subscribe((data) => handler(JSON.parse(data) as "
+      <> "    return this.transport.subscribe((data) => {\n"
+      <> "      const env = parseFrame(data);\n"
+      <> "      if (env?.type === \""
+      <> wire_type
+      <> "\") handler(env.payload as "
       <> payload
-      <> "));\n"
+      <> ");\n"
+      <> "    });\n"
       <> "  }"
     Publish(method:, payload:) ->
       "  /** Publish a `"

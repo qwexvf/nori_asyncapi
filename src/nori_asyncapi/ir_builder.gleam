@@ -291,14 +291,12 @@ fn lookup_message(doc: Document, ref: String) -> Option(#(String, Message)) {
       |> option.from_result
       |> option.map(fn(m) { #(name, m) })
     ["channels", chan, "messages", name] ->
-      case dict.get(doc.channels, chan) {
-        Ok(ch) ->
-          case dict.get(ch.messages, name) {
-            Ok(mor) -> resolve_message_or_ref(doc, name, mor)
-            Error(_) -> None
-          }
-        Error(_) -> None
-      }
+      dict.get(doc.channels, chan)
+      |> option.from_result
+      |> option.then(fn(ch) {
+        dict.get(ch.messages, name) |> option.from_result
+      })
+      |> option.then(fn(mor) { resolve_message_or_ref(doc, name, mor) })
     _ -> None
   }
 }

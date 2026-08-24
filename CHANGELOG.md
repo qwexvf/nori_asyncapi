@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.4.0
+
+### Fixed
+
+- Per-channel TypeScript client now reads the server's `{type,payload}` envelope
+  instead of blind-casting the whole frame to the payload type, so subscribed
+  fields are no longer `undefined` (#1). Each `on*` handler also guards on the
+  message `type`, so a channel with more than one `send` message demultiplexes
+  correctly instead of delivering every frame to every handler (#2).
+- Send-only specs no longer generate dead Gleam: `handlers.gleam` drops the
+  `emit_*` `todo` stubs (they duplicated `send_*`) and emits only the imports it
+  uses; `server.gleam` no longer imports `gleam/dynamic/decode` when there is no
+  dispatcher (#3).
+
+### Added
+
+- SSE resume helpers in `server.gleam` for specs with `send` messages: an
+  `SseResume` type, `sse_event(id, frame)` to stamp a resume cursor on each
+  event, and `sse_backlog(resume, last_event_id)` to replay only what a
+  reconnecting `EventSource` client missed via `Last-Event-ID` (#4).
+
 ## v0.3.0
 
 ### Added
